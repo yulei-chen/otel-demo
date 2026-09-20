@@ -26,6 +26,10 @@ exporters:
     endpoint: ${env:PROMETHEUS_OTLP_ENDPOINT}
     tls:
       insecure: true
+  otlphttp/loki:
+    endpoint: ${env:LOKI_OTLP_ENDPOINT}
+    tls:
+      insecure: true
 
 service:
   extensions: [bearertokenauth/otlp, health_check]
@@ -34,4 +38,8 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
 
