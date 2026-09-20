@@ -21,29 +21,29 @@ const server = createServer(async (request, response) => {
 
   if (url.pathname === '/health') {
   response.writeHead(200).end('ok');
-} else if (url.pathname === '/work') {
-  await tracer.startActiveSpan('demo.work', async (span) => {
-    try {
-      span.setAttribute('demo.operation', 'simulated-work');
-      await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 250));
+  } else if (url.pathname === '/work') {
+    await tracer.startActiveSpan('demo.work', async (span) => {
+      try {
+        span.setAttribute('demo.operation', 'simulated-work');
+        await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 250));
 
-      if (url.searchParams.get('fail') === 'true') {
-        const error = new Error('The simulated operation failed');
-        statusCode = 500;
-        span.recordException(error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        if (url.searchParams.get('fail') === 'true') {
+          const error = new Error('The simulated operation failed');
+          statusCode = 500;
+          span.recordException(error);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        }
+
+        response.writeHead(statusCode, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ ok: statusCode === 200 }));
+      } finally {
+        span.end();
       }
-
-      response.writeHead(statusCode, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ ok: statusCode === 200 }));
-    } finally {
-      span.end();
-    }
-  });
-} else {
-  statusCode = 404;
-  response.writeHead(statusCode).end('not found');
-}
+    });
+  } else {
+    statusCode = 404;
+    response.writeHead(statusCode).end('not found');
+  }
 
   const elapsed = performance.now() - startedAt;
   const attributes: Attributes = {
