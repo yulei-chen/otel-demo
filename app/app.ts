@@ -1,7 +1,10 @@
 import { type Attributes, metrics } from '@opentelemetry/api';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { createServer } from 'node:http';
 
 const meter = metrics.getMeter('otel-demo-api');
+const logger = logs.getLogger('otel-demo-api');
+
 const requests = meter.createCounter('demo_http_requests', {
   description: 'Number of HTTP requests handled by the demo app',
 });
@@ -27,12 +30,26 @@ const server = createServer(async (request, response) => {
     response.writeHead(statusCode).end('not found');
   }
 
+  const elapsed = performance.now() - startedAt;
   const attributes: Attributes = {
     'http.route': route,
     'http.response.status_code': statusCode,
   };
+
   requests.add(1, attributes);
-  duration.record(performance.now() - startedAt, attributes);
+  duration.record(elapsed, attributes);
+
+  const failed = statusCode >= 500;
+  logger.emit({
+    severityNumber: failed ? SeverityNumber.ERROR : SeverityNumber.INFO,
+    severityText: failed ? 'ERROR' : 'INFO',
+    body: failed ? 'Request failed' : 'Request completed',
+    attributes: {
+      ...attributes,
+      'http.request.method': request.method ?? 'UNKNOWN',
+      'http.server.request.duration_ms': Math.round(elapsed),
+    },
+  });
 });
 
 const port = Number(process.env.PORT || 3000);
