@@ -1,9 +1,10 @@
-import { type Attributes, metrics } from '@opentelemetry/api';
+import { type Attributes, metrics, SpanStatusCode, trace } from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { createServer } from 'node:http';
 
 const meter = metrics.getMeter('otel-demo-api');
 const logger = logs.getLogger('otel-demo-api');
+const tracer = trace.getTracer('otel-demo-api');
 
 const requests = meter.createCounter('demo_http_requests', {
   description: 'Number of HTTP requests handled by the demo app',
@@ -19,16 +20,30 @@ const server = createServer(async (request, response) => {
   let statusCode = 200;
 
   if (url.pathname === '/health') {
-    response.writeHead(200).end('ok');
-  } else if (url.pathname === '/work') {
-    await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 250));
-    statusCode = url.searchParams.get('fail') === 'true' ? 500 : 200;
-    response.writeHead(statusCode, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ ok: statusCode === 200 }));
-  } else {
-    statusCode = 404;
-    response.writeHead(statusCode).end('not found');
-  }
+  response.writeHead(200).end('ok');
+} else if (url.pathname === '/work') {
+  await tracer.startActiveSpan('demo.work', async (span) => {
+    try {
+      span.setAttribute('demo.operation', 'simulated-work');
+      await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 250));
+
+      if (url.searchParams.get('fail') === 'true') {
+        const error = new Error('The simulated operation failed');
+        statusCode = 500;
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      }
+
+      response.writeHead(statusCode, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ ok: statusCode === 200 }));
+    } finally {
+      span.end();
+    }
+  });
+} else {
+  statusCode = 404;
+  response.writeHead(statusCode).end('not found');
+}
 
   const elapsed = performance.now() - startedAt;
   const attributes: Attributes = {

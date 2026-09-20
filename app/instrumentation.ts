@@ -1,5 +1,7 @@
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { defaultResource, resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
@@ -28,7 +30,7 @@ const metricReader = new PeriodicExportingMetricReader({
   exportIntervalMillis: 5000,
 });
 
-const logProcessor = new BatchLogRecordProcessor({ // [!code ++]
+const logProcessor = new BatchLogRecordProcessor({
   exporter: new OTLPLogExporter({
     url: `${endpoint}/v1/logs`,
     headers,
@@ -37,8 +39,15 @@ const logProcessor = new BatchLogRecordProcessor({ // [!code ++]
 
 const sdk = new NodeSDK({
   resource,
+  traceExporter: new OTLPTraceExporter({
+    url: `${endpoint}/v1/traces`,
+    headers,
+  }),
   metricReaders: [metricReader],
   logRecordProcessors: [logProcessor],
+  instrumentations: [getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-fs': { enabled: false },
+  })],
 });
 
 sdk.start();

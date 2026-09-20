@@ -30,6 +30,10 @@ exporters:
     endpoint: ${env:LOKI_OTLP_ENDPOINT}
     tls:
       insecure: true
+  otlp/tempo:
+    endpoint: ${env:TEMPO_OTLP_GRPC_ENDPOINT}
+    tls:
+      insecure: true
 
 service:
   extensions: [bearertokenauth/otlp, health_check]
@@ -42,4 +46,8 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/loki]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
 
