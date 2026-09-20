@@ -1,0 +1,37 @@
+extensions:
+  bearertokenauth/otlp:
+    token: ${env:OTEL_AUTH_TOKEN}
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/otlp
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+exporters:
+  otlphttp/prometheus:
+    endpoint: ${env:PROMETHEUS_OTLP_ENDPOINT}
+    tls:
+      insecure: true
+
+service:
+  extensions: [bearertokenauth/otlp, health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/prometheus]
+
